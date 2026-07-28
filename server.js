@@ -4,15 +4,18 @@ const FormData = require('form-data');
 const admin = require('firebase-admin');
 
 // ==========================================
-// CONFIGURATION — à remplir avec tes valeurs
+// CONFIGURATION — lue depuis les variables d'environnement
+// (configurées sur Render, jamais codées en dur ici)
 // ==========================================
-const VERIFY_TOKEN = 'assistantIA2026secret';
-const WHATSAPP_TOKEN = 'EAAMsPRMFLNIBSPQD6CMiXyMtxp8u37hVOlHtFQsl2TzYsDbkAarnZC0cgcxxP1pMrEmh4lhXz5my1CSX9eWeHqobeZCHfgZAfBW7kwhKNzUZANQCD4ylANpTOlsBuo0DRaw9bERUCcT9PhsHuPJCSTvtWBwoiHE4ttCTaYJeGVkm95SRr2u0suCnZBd9Mq4Ir91aZB5WZA44zAkZBDEorndUurhu4iimkwaeLjCNUCMYgvWIwly18EIlZBI1gaZAAJNSRJKSyuZBcYaRoZBn8fKpClJA32oZD';
-const PHONE_NUMBER_ID = '1213283205208254';
-const OCR_API_KEY = 'K81143366088957';                // ta clé OCR.space existante
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const OCR_API_KEY = process.env.OCR_API_KEY;
 
-// Initialisation Firebase (le fichier json est ta clé de compte de service)
-const serviceAccount = require('./firebase-service-account.json');
+// Le contenu du fichier firebase-service-account.json est collé
+// tel quel dans la variable d'environnement FIREBASE_SERVICE_ACCOUNT
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
