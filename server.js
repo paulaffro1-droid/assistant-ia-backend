@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
 const admin = require('firebase-admin');
+const { pcsLogin } = require('./pcs_login');
 
 // ==========================================
 // CONFIGURATION — lue depuis les variables d'environnement
@@ -108,6 +110,18 @@ app.post('/webhook', async (req, res) => {
     });
 
     console.log(`Ticket enregistré : ${type} / ${montant} / ${code}`);
+
+    // Si c'est un ticket PCS, on déclenche automatiquement la connexion
+    if (type === 'PCS') {
+      console.log('Ticket PCS détecté, déclenchement de la connexion automatique...');
+
+      const resultatConnexion = await pcsLogin(
+        process.env.PCS_USERNAME,
+        process.env.PCS_PASSWORD,
+      );
+
+      console.log('Résultat de la connexion PCS automatique :', resultatConnexion);
+    }
   } catch (erreur) {
     console.error('Erreur lors du traitement du message :', erreur.message);
   }
@@ -203,6 +217,28 @@ function detecterCode(texte) {
 }
 
 // ==========================================
+const { pcsLogin } = require('./pcs_login');
+
+app.post('/pcs-login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'username et password sont requis',
+    });
+  }
+
+  console.log(`Tentative de connexion PCS pour l'utilisateur : ${username}`);
+
+  const resultat = await pcsLogin(username, password);
+
+  console.log('Résultat de la connexion PCS :', resultat);
+
+  res.json(resultat);
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
