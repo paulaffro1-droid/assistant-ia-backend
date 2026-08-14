@@ -1,6 +1,13 @@
 const sharp = require('sharp');
 const fs = require('fs');
-const puppeteer = require('puppeteer');
+const chromium = require('@sparticuz/chromium');
+
+// Sur Render (Linux), on utilise puppeteer-core + chromium précompilé.
+// En local sur Windows, on utilise le puppeteer complet (avec son propre Chrome).
+const estSurRender = process.platform === 'linux';
+const puppeteer = estSurRender
+  ? require('puppeteer-core')
+  : require('puppeteer');
 const { createWorker, PSM } = require('tesseract.js');
 
 let workerPartage = null;
@@ -20,14 +27,23 @@ async function pcsLogin(username, password) {
   let browser;
 
   try {
-    browser = await puppeteer.launch({
-      headless: false,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    });
+   const optionsLancement = estSurRender
+      ? {
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        }
+      : {
+          headless: 'new',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+          ],
+        };
+
+    browser = await puppeteer.launch(optionsLancement);
 
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
@@ -111,10 +127,8 @@ async function pcsLogin(username, password) {
       success: false,
       message: `Erreur lors de la connexion : ${erreur.message}`,
     };
-  } finally {
-     // On ne ferme plus automatiquement le navigateur,
-    // pour que la fenêtre reste visible et consultable.
-    // (à réactiver plus tard pour la version en production sur Render)
+ } finally {
+    if (browser) await browser.close();
   }
 }
 
