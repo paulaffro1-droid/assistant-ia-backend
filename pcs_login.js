@@ -1,6 +1,6 @@
 const sharp = require('sharp');
-const fs = require('fs');
 const chromium = require('@sparticuz/chromium');
+const { createWorker, PSM } = require('tesseract.js');
 
 // Sur Render (Linux), on utilise puppeteer-core + chromium précompilé.
 // En local sur Windows, on utilise le puppeteer complet (avec son propre Chrome).
@@ -8,7 +8,6 @@ const estSurRender = process.platform === 'linux';
 const puppeteer = estSurRender
   ? require('puppeteer-core')
   : require('puppeteer');
-const { createWorker, PSM } = require('tesseract.js');
 
 let workerPartage = null;
 
@@ -23,11 +22,16 @@ async function getWorker() {
   return workerPartage;
 }
 
+/**
+ * Se connecte automatiquement sur mypcs.com.
+ * Retourne success/message, ET une capture d'écran en base64 de la
+ * page finale (preuve visuelle, à afficher dans l'app Flutter).
+ */
 async function pcsLogin(username, password) {
   let browser;
 
   try {
-   const optionsLancement = estSurRender
+    const optionsLancement = estSurRender
       ? {
           args: chromium.args,
           defaultViewport: chromium.defaultViewport,
@@ -113,36 +117,36 @@ async function pcsLogin(username, password) {
 
     const urlFinale = page.url();
     const connexionReussie = !urlFinale.includes('/login');
-    
-    console.log('Connexion terminée, la fenêtre Chrome reste ouverte.');
+
+    // Capture la page finale comme preuve visuelle
+    const screenshotFinal = await page.screenshot({ encoding: 'base64' });
+
+    console.log('Connexion terminée :', connexionReussie ? 'réussie' : 'échouée');
 
     return {
       success: connexionReussie,
       message: connexionReussie
         ? 'Connexion réussie'
         : 'Connexion échouée (identifiants incorrects ou blocage du site)',
+      screenshotBase64: screenshotFinal,
     };
   } catch (erreur) {
     return {
       success: false,
       message: `Erreur lors de la connexion : ${erreur.message}`,
+      screenshotBase64: null,
     };
- } finally {
+  } finally {
     if (browser) await browser.close();
   }
 }
 
-/**
- * Découpe la capture du clavier en 10 petites images (une par case),
- * et utilise Tesseract.js EN LOCAL (mode "un seul caractère") pour
- * lire chaque chiffre. Pas d'appel réseau externe, pas de rate limit.
- */
 async function lireChiffresCaseParCase(screenshotBrut, boutons, keyboardBox) {
   const image = sharp(screenshotBrut);
   const metadata = await image.metadata();
 
   const mapping = {};
-  const marge = 6; // on garde le bouton en entier, avec une petite marge
+  const marge = 6;
 
   const worker = await getWorker();
 
@@ -161,10 +165,8 @@ async function lireChiffresCaseParCase(screenshotBrut, boutons, keyboardBox) {
       .extract({ left, top, width, height })
       .resize({ width: 400 })
       .greyscale()
-      .linear(1.3, -30) // augmente le contraste
-      .toBuffer()
-
-    fs.writeFileSync(`debug_case_${bouton.position}.png`, decoupe);
+      .linear(1.3, -30)
+      .toBuffer();
 
     const {
       data: { text },
@@ -173,7 +175,7 @@ async function lireChiffresCaseParCase(screenshotBrut, boutons, keyboardBox) {
     const match = text.match(/\d/);
     const chiffreLu = match ? match[0] : null;
 
-    console.log(`Case ${bouton.position} -> chiffre lu : "${chiffreLu}" (brut: "${text.trim()}")`);
+    console.log(`Case ${bouton.position} -> chiffre lu : "${chiffreLu}"`);
 
     if (chiffreLu) {
       mapping[chiffreLu] = bouton.position;
